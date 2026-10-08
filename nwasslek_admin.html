@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NWASSLEK — Admin</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:#0b0b0b;color:#fff;min-height:100vh}
+    .wrap{width:min(92%,560px);margin:0 auto;padding:28px 0 50px}
+    .brand{text-align:center;margin-bottom:24px}
+    .brand h1{margin:0;color:#ffd21c;font-size:32px}
+    .brand p{margin:7px 0;color:#aaa}
+    .card{background:#151515;border:1px solid #292929;border-radius:22px;padding:22px;margin-bottom:16px;box-shadow:0 10px 35px #0005}
+    h2{margin:0 0 18px;font-size:21px}
+    label{display:block;color:#bbb;font-size:14px;margin:13px 0 7px}
+    input{width:100%;padding:13px 14px;border-radius:12px;border:1px solid #383838;background:#0d0d0d;color:#fff;font-size:15px;outline:none}
+    input:focus{border-color:#ffd21c}
+    button{width:100%;padding:14px;border:0;border-radius:13px;font-weight:800;font-size:16px;cursor:pointer;margin-top:15px}
+    .yellow{background:#ffd21c;color:#080808}
+    .dark{background:#242424;color:#fff}
+    .danger{background:#3a1717;color:#ffb7b7}
+    .msg{display:none;margin-top:13px;padding:12px;border-radius:12px;font-size:14px;line-height:1.5}
+    .ok{display:block;background:#12351f;color:#a7f3bd}
+    .err{display:block;background:#3a1717;color:#ffb7b7}
+    #panel{display:none}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:15px}
+    .top h2{margin:0}
+    .status{font-size:12px;color:#a7f3bd;background:#12351f;padding:7px 10px;border-radius:20px}
+    .hint{color:#999;font-size:13px;line-height:1.6}
+    .save{position:sticky;bottom:12px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <h1>NWASSLEK</h1>
+    <p>لوحة التحكم</p>
+  </div>
+
+  <div class="card" id="setup">
+    <h2>إعداد الاتصال</h2>
+    <p class="hint">دخل Project URL و Publishable/Anon Key تاع Supabase مرة واحدة على هذا الجهاز.</p>
+    <label>Supabase Project URL</label>
+    <input id="sbUrl" placeholder="https://xxxxxxxx.supabase.co">
+    <label>Supabase Publishable / Anon Key</label>
+    <input id="sbKey" placeholder="eyJ..." autocomplete="off">
+    <button class="yellow" onclick="connect()">اتصال</button>
+    <div id="setupMsg" class="msg"></div>
+  </div>
+
+  <div class="card" id="login" style="display:none">
+    <h2>تسجيل الدخول 🔐</h2>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username">
+    <label>Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <button class="yellow" onclick="login()">دخول</button>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+
+  <div class="card" id="panel">
+    <div class="top">
+      <h2>إعدادات الموقع</h2>
+      <span class="status">Admin</span>
+    </div>
+
+    <label>اسم الموقع</label>
+    <input id="site_name">
+    <label>الشعار / Slogan</label>
+    <input id="slogan">
+    <label>المنطقة</label>
+    <input id="location">
+    <label>Instagram</label>
+    <input id="instagram" type="url">
+    <label>TikTok</label>
+    <input id="tiktok" type="url">
+    <label>Snapchat</label>
+    <input id="snapchat" type="url">
+    <label>WhatsApp</label>
+    <input id="whatsapp" type="url">
+    <label>رقم الهاتف</label>
+    <input id="phone" type="tel">
+    <label>رابط حاسبة الأسعار</label>
+    <input id="calculator_url" type="url">
+
+    <button class="yellow save" onclick="saveSettings()">حفظ التغييرات 💾</button>
+    <button class="dark" onclick="loadSettings()">إعادة تحميل البيانات</button>
+    <button class="danger" onclick="logout()">تسجيل الخروج</button>
+    <div id="panelMsg" class="msg"></div>
+  </div>
+</div>
+
+<script>
+let client = null;
+const KEY_URL = "nwasslek_sb_url";
+const KEY_ANON = "nwasslek_sb_anon";
+
+function msg(id,text,type){
+  const e=document.getElementById(id);
+  e.textContent=text;
+  e.className="msg "+type;
+}
+
+function connect(){
+  const url=document.getElementById("sbUrl").value.trim();
+  const key=document.getElementById("sbKey").value.trim();
+  if(!url || !key){msg("setupMsg","دخل Project URL والـ Publishable/Anon Key.","err");return;}
+  try{
+    client = supabase.createClient(url,key);
+    localStorage.setItem(KEY_URL,url);
+    localStorage.setItem(KEY_ANON,key);
+    document.getElementById("setup").style.display="none";
+    document.getElementById("login").style.display="block";
+    msg("loginMsg","الاتصال بـ Supabase نجح. سجل الدخول.","ok");
+  }catch(e){
+    msg("setupMsg","بيانات الاتصال غير صحيحة.","err");
+  }
+}
+
+async function login(){
+  const email=document.getElementById("email").value.trim();
+  const password=document.getElementById("password").value;
+  if(!email||!password){msg("loginMsg","دخل الإيميل والباسوورد.","err");return;}
+  const {data,error}=await client.auth.signInWithPassword({email,password});
+  if(error){msg("loginMsg",error.message,"err");return;}
+
+  const {data:admin,error:adminError}=await client
+    .from("admins").select("role").eq("user_id",data.user.id).maybeSingle();
+
+  if(adminError || !admin){
+    await client.auth.signOut();
+    msg("loginMsg","هذا الحساب ليس Admin.","err");
+    return;
+  }
+
+  document.getElementById("login").style.display="none";
+  document.getElementById("panel").style.display="block";
+  await loadSettings();
+}
+
+async function loadSettings(){
+  const {data,error}=await client.from("site_settings").select("*").limit(1).maybeSingle();
+  if(error){msg("panelMsg",error.message,"err");return;}
+  if(!data){msg("panelMsg","ما لقيتش إعدادات الموقع.","err");return;}
+  ["site_name","slogan","location","instagram","tiktok","snapchat","whatsapp","phone","calculator_url"]
+    .forEach(k=>document.getElementById(k).value=data[k]||"");
+  msg("panelMsg","تم تحميل البيانات ✅","ok");
+}
+
+async function saveSettings(){
+  const fields=["site_name","slogan","location","instagram","tiktok","snapchat","whatsapp","phone","calculator_url"];
+  const values={};
+  fields.forEach(k=>values[k]=document.getElementById(k).value.trim());
+  values.updated_at=new Date().toISOString();
+
+  const {data,error}=await client
+    .from("site_settings")
+    .update(values)
+    .eq("id",1)
+    .select()
+    .maybeSingle();
+
+  if(error){msg("panelMsg",error.message,"err");return;}
+  if(!data){msg("panelMsg","ما تم حتى تعديل. تأكد من صلاحيات Admin.","err");return;}
+  msg("panelMsg","تم حفظ التغييرات بنجاح ✅","ok");
+}
+
+async function logout(){
+  if(client) await client.auth.signOut();
+  document.getElementById("panel").style.display="none";
+  document.getElementById("login").style.display="block";
+  msg("loginMsg","تم تسجيل الخروج.","ok");
+}
+
+window.addEventListener("load",()=>{
+  const u=localStorage.getItem(KEY_URL);
+  const k=localStorage.getItem(KEY_ANON);
+  if(u&&k){
+    document.getElementById("sbUrl").value=u;
+    document.getElementById("sbKey").value=k;
+    connect();
+  }
+});
+</script>
+</body>
+</html>
